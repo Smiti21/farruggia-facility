@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Leaf, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import ServiceMotif from './ServiceMotifs';
 import { useLanguage } from './LanguageContext';
 import { subscribeToDeviceTilt } from '../lib/deviceTilt';
 import { allowInputMotion, canHover } from '../lib/motion';
@@ -260,6 +261,10 @@ export default function ServicesCarousel() {
         const tiltY = tilt.current.x * 18 * centreFactor;
 
         card.style.zIndex = Math.round(z).toString();
+        // Drives the specular band. Scaled by centreFactor so only the card
+        // facing the viewer catches the light; the ones turning away keep a
+        // still highlight, which is how real glass behaves off-axis.
+        card.style.setProperty('--sheen', (tilt.current.x * 70 * centreFactor).toFixed(1));
         card.style.transform =
           `translateY(${y.toFixed(2)}px) translateZ(${z.toFixed(2)}px) ` +
           `rotateX(${(-sign * rot + tiltX).toFixed(2)}deg) ` +
@@ -330,13 +335,40 @@ export default function ServicesCarousel() {
                         // inside a rotating preserve-3d subtree is both very
                         // expensive and unreliable across browsers.
                         background:
-                          'linear-gradient(150deg, rgba(255,255,255,0.11), rgba(255,255,255,0.03) 45%, rgba(0,0,0,0.30))',
+                          'linear-gradient(150deg, rgba(255,255,255,0.13), rgba(255,255,255,0.03) 45%, rgba(0,0,0,0.32))',
                         transform: `translateZ(${zOffset}px)`,
                         backfaceVisibility: 'hidden',
+                        // Refractive rim: bright along the top-left where the
+                        // light lands, dark along the bottom-right, plus the
+                        // drop shadow that lifts the card off the background.
                         boxShadow:
-                          'inset 0 1px 0 rgba(255,255,255,0.22), 0 30px 60px -25px rgba(0,0,0,0.9)',
+                          'inset 0 1px 0 rgba(255,255,255,0.28), inset 1px 0 0 rgba(255,255,255,0.14),' +
+                          'inset 0 -1px 0 rgba(0,0,0,0.35), inset -1px 0 0 rgba(0,0,0,0.25),' +
+                          '0 30px 60px -25px rgba(0,0,0,0.9)',
                       }}
                     >
+                      {/* Etched ornament, masked away under the text block. */}
+                      <div
+                        className="absolute inset-0 text-white/[0.16]"
+                        style={{
+                          maskImage:
+                            'radial-gradient(135% 100% at 22% 92%, transparent 0%, transparent 30%, #000 72%)',
+                          WebkitMaskImage:
+                            'radial-gradient(135% 100% at 22% 92%, transparent 0%, transparent 30%, #000 72%)',
+                        }}
+                      >
+                        <ServiceMotif serviceKey={item.key} />
+                      </div>
+
+                      {/* Bloom sitting just under the surface. */}
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background:
+                            'radial-gradient(70% 55% at 18% 8%, rgba(255,255,255,0.16), transparent 70%)',
+                        }}
+                      />
+
                       <div className="absolute inset-0 p-6 sm:p-7 flex flex-col justify-between">
                         <div className="flex items-start justify-between">
                           <Icon
@@ -360,12 +392,18 @@ export default function ServicesCarousel() {
                         </div>
                       </div>
 
-                      {/* Sheen across the surface, as on a real card. */}
+                      {/* Specular band. Twice the card's width and slid across
+                          by --sheen, which the render loop drives from the tilt,
+                          so the highlight tracks the light as the card turns.
+                          Translating a pre-rendered gradient is compositor work;
+                          animating the gradient's own stops would repaint. */}
                       <div
-                        className="absolute inset-0 pointer-events-none"
+                        className="absolute inset-y-0 -left-1/2 w-[200%] pointer-events-none"
                         style={{
                           background:
-                            'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.10) 45%, transparent 60%)',
+                            'linear-gradient(102deg, transparent 38%, rgba(255,255,255,0.05) 45%,' +
+                            'rgba(255,255,255,0.20) 50%, rgba(255,255,255,0.05) 55%, transparent 62%)',
+                          transform: 'translateX(calc(var(--sheen, 0) * 1px))',
                         }}
                       />
                     </div>
