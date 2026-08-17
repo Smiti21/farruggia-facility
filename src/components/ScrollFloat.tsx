@@ -42,10 +42,11 @@ export default function ScrollFloat({ children, className = '' }: ScrollFloatPro
           scrollTrigger: {
             trigger: document.body,
             start: 'top top',
-            // One viewport of scroll, not a fixed 1000px. The hero track is
-            // sized as a multiple of this, so the two stay in step at any
-            // screen height instead of leaving dead scroll on tall displays.
-            end: () => `+=${window.innerHeight}`,
+            // Viewport-relative, so the track and the fade stay in step at any
+            // screen height. Deliberately shorter than one viewport: the glass
+            // panel starts rising at 0.25vh, and the two need to overlap or
+            // there is a moment showing nothing but video.
+            end: () => `+=${window.innerHeight * 0.8}`,
             scrub: 0.8,
             invalidateOnRefresh: true,
           },

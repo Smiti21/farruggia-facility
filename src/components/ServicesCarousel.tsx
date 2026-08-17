@@ -1,0 +1,351 @@
+import { useEffect, useRef, useState } from 'react';
+import { Leaf, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { useLanguage } from './LanguageContext';
+import { subscribeToDeviceTilt } from '../lib/deviceTilt';
+import { allowInputMotion, canHover } from '../lib/motion';
+import type { ServiceItem, ServiceKey } from '../translations';
+
+const ICONS: Record<ServiceKey, LucideIcon> = {
+  technical: Wrench,
+  security: ShieldCheck,
+  landscaping: Leaf,
+  other: Sparkles,
+};
+
+/**
+ * Parallel slices that give each card real volumetric thickness. Stacking a few
+ * layers a fraction of a pixel apart reads as a solid object with an edge, which
+ * a single flat div never does once it rotates.
+ */
+const THICKNESS = [-1.47, -0.73, 0, 0.73, 1.47];
+
+/** Perspective distance. The peek maths below depends on this exact value. */
+const PERSPECTIVE = 1350;
+/** Progress added per frame. One card every ~7.5s at 60fps. */
+const SPEED = 0.0022;
+/** Gap between the centre card and its neighbours. */
+const GAP = 36;
+/** How far past the stage edge the outer cards are pushed. */
+const PEEK = -55;
+
+const smoothstep = (t: number) => t * t * (3 - 2 * t);
+
+export default function ServicesCarousel() {
+  const { tList } = useLanguage();
+  const items = tList<ServiceItem>('services.items');
+  const cardCount = items.length;
+
+  const stageRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const frameId = useRef(0);
+
+  const progress = useRef(0);
+  const tilt = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
+  // Defaults to visible so that if IntersectionObserver never reports (or is
+  // unavailable) the carousel still animates. Defaulting to false would leave
+  // it frozen with no way to recover.
+  const visible = useRef(true);
+  const paused = useRef(false);
+
+  const [metrics, setMetrics] = useState({ cardW: 340, cardH: 243 });
+
+  /* ---- Responsive card size --------------------------------------------- */
+  useEffect(() => {
+    const resize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      let cardW = Math.round(w * 0.2 + 150);
+      // Shrink on short viewports so three cards still fit vertically.
+      cardW = Math.round(cardW * Math.min(1, Math.max(0.66, h / 880)));
+      cardW = Math.min(380, Math.max(232, cardW));
+
+      // Taller than a bank card's 1.59 — these hold a heading and a paragraph.
+      setMetrics({ cardW, cardH: Math.round(cardW / 1.4) });
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+
+  /* ---- Tilt input: cursor on desktop, the handset itself on phones -------- */
+  useEffect(() => {
+    if (!allowInputMotion()) return;
+
+    if (canHover()) {
+      const onMove = (e: MouseEvent) => {
+        tilt.current.targetX = Math.max(-1, Math.min(1, (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2)));
+        tilt.current.targetY = Math.max(-1, Math.min(1, (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2)));
+      };
+      const onLeave = () => {
+        tilt.current.targetX = 0;
+        tilt.current.targetY = 0;
+      };
+
+      window.addEventListener('mousemove', onMove, { passive: true });
+      document.addEventListener('mouseleave', onLeave);
+      return () => {
+        window.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseleave', onLeave);
+      };
+    }
+
+    // No cursor: the gyroscope drives exactly the same two variables.
+    return subscribeToDeviceTilt((x, y) => {
+      tilt.current.targetX = x;
+      tilt.current.targetY = y;
+    });
+  }, []);
+
+  /* ---- Only animate while the section is actually on screen -------------- */
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || typeof IntersectionObserver === 'undefined') {
+      visible.current = true;
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        visible.current = entry.isIntersecting;
+      },
+      { rootMargin: '10% 0px' },
+    );
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, []);
+
+  /* ---- Render loop -------------------------------------------------------- */
+  useEffect(() => {
+    if (!cardCount) return;
+    const { cardH } = metrics;
+
+    const tick = () => {
+      frameId.current = requestAnimationFrame(tick);
+
+      // Off-screen: skip all the work, but keep the loop alive so it resumes
+      // the moment the section scrolls back in.
+      if (!visible.current) return;
+
+      if (!paused.current) progress.current += SPEED;
+
+      // Inertia — the tilt lags the cursor rather than snapping to it.
+      tilt.current.x += (tilt.current.targetX - tilt.current.x) * 0.08;
+      tilt.current.y += (tilt.current.targetY - tilt.current.y) * 0.08;
+
+      const stage = stageRef.current;
+      const h = stage?.clientHeight ?? window.innerHeight;
+
+      const continuous = progress.current;
+      const rounded = Math.round(continuous);
+      const diff = continuous - rounded;
+      // Non-linear step: the carousel dwells at each card before accelerating
+      // to the next, instead of drifting at a constant rate.
+      const eased = Math.sign(diff) * Math.pow(Math.abs(diff) * 2, 4.2) / 2;
+      const active = rounded + eased;
+
+      for (let i = 0; i < cardCount; i++) {
+        const card = cardRefs.current[i];
+        if (!card) continue;
+
+        // Wrap to the nearest representation around the cylinder.
+        let offset = i - active;
+        const half = cardCount / 2;
+        while (offset > half) offset -= cardCount;
+        while (offset < -half) offset += cardCount;
+
+        const abs = Math.abs(offset);
+        const sign = Math.sign(offset);
+
+        if (abs > 3) {
+          card.style.visibility = 'hidden';
+          continue;
+        }
+        card.style.visibility = 'visible';
+
+        let y = 0;
+        let z = 0;
+        let rot = 0;
+
+        if (abs <= 1) {
+          const t = smoothstep(abs);
+          y = -sign * (t * (cardH + GAP));
+          z = 400 + t * (220 - 400);
+          rot = t * 132;
+        } else if (abs <= 2) {
+          const t = smoothstep(abs - 1);
+          const zEnd = -60;
+          // Perspective-aware, so the card's edge lands exactly on the stage
+          // boundary rather than at an arbitrary offset.
+          const scaleEnd = PERSPECTIVE / (PERSPECTIVE - zEnd);
+          const yEnd = (h / 2 - PEEK) / scaleEnd - cardH / 2;
+
+          y = -sign * ((cardH + GAP) + t * (yEnd - (cardH + GAP)));
+          z = 220 + t * (zEnd - 220);
+          rot = 132 + t * (175 - 132);
+        } else {
+          const t = smoothstep(Math.min(abs - 2, 1));
+          const zMid = -60;
+          const zEnd = -250;
+
+          const scaleMid = PERSPECTIVE / (PERSPECTIVE - zMid);
+          const yMid = (h / 2 - PEEK) / scaleMid - cardH / 2;
+          const scaleEnd = PERSPECTIVE / (PERSPECTIVE - zEnd);
+          const yEnd = (h / 2 + 100) / scaleEnd + cardH / 2;
+
+          y = -sign * (yMid + t * (yEnd - yMid));
+          z = zMid + t * (zEnd - zMid);
+          rot = 175 + t * (195 - 175);
+        }
+
+        // Interactive tilt applies only to the card at the front.
+        const centreFactor = Math.max(0, 1 - abs);
+        const tiltX = -tilt.current.y * 14 * centreFactor;
+        const tiltY = tilt.current.x * 18 * centreFactor;
+
+        card.style.zIndex = Math.round(z).toString();
+        card.style.transform =
+          `translateY(${y.toFixed(2)}px) translateZ(${z.toFixed(2)}px) ` +
+          `rotateX(${(-sign * rot + tiltX).toFixed(2)}deg) ` +
+          `rotateY(${tiltY.toFixed(2)}deg) rotateZ(-3deg)`;
+      }
+    };
+
+    frameId.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId.current);
+  }, [metrics, cardCount]);
+
+  return (
+    <div
+      ref={stageRef}
+      className="relative w-full h-[70vh] min-h-[520px] max-h-[760px] flex items-center justify-center overflow-hidden"
+      style={{ perspective: `${PERSPECTIVE}px` }}
+      onMouseEnter={() => { paused.current = true; }}
+      onMouseLeave={() => { paused.current = false; }}
+    >
+      <div
+        className="absolute"
+        style={{
+          width: `${metrics.cardW}px`,
+          height: `${metrics.cardH}px`,
+          transformStyle: 'preserve-3d',
+        }}
+      >
+        {items.map((item, i) => {
+          const Icon = ICONS[item.key];
+          return (
+            <div
+              key={item.key}
+              ref={(el) => { cardRefs.current[i] = el; }}
+              className="absolute inset-0"
+              style={{
+                width: `${metrics.cardW}px`,
+                height: `${metrics.cardH}px`,
+                transformStyle: 'preserve-3d',
+                backfaceVisibility: 'visible',
+              }}
+            >
+              {THICKNESS.map((zOffset, layer) => {
+                const isFront = layer === THICKNESS.length - 1;
+                const isBack = layer === 0;
+
+                // Structural middle slices — these are the visible "edge".
+                if (!isFront && !isBack) {
+                  return (
+                    <div
+                      key={layer}
+                      className="absolute inset-0 rounded-[18px] pointer-events-none"
+                      style={{
+                        backgroundColor: 'rgba(120,120,120,0.55)',
+                        transform: `translateZ(${zOffset}px)`,
+                      }}
+                    />
+                  );
+                }
+
+                if (isFront) {
+                  return (
+                    <div
+                      key={layer}
+                      className="absolute inset-0 rounded-[18px] overflow-hidden pointer-events-none border border-white/15"
+                      style={{
+                        // A translucent fill rather than backdrop-filter: a blur
+                        // inside a rotating preserve-3d subtree is both very
+                        // expensive and unreliable across browsers.
+                        background:
+                          'linear-gradient(150deg, rgba(255,255,255,0.11), rgba(255,255,255,0.03) 45%, rgba(0,0,0,0.30))',
+                        transform: `translateZ(${zOffset}px)`,
+                        backfaceVisibility: 'hidden',
+                        boxShadow:
+                          'inset 0 1px 0 rgba(255,255,255,0.22), 0 30px 60px -25px rgba(0,0,0,0.9)',
+                      }}
+                    >
+                      <div className="absolute inset-0 p-6 sm:p-7 flex flex-col justify-between">
+                        <div className="flex items-start justify-between">
+                          <Icon
+                            size={30}
+                            strokeWidth={1.1}
+                            className="text-white/85"
+                            aria-hidden="true"
+                          />
+                          <span className="font-sans text-[11px] tracking-[0.28em] text-white/40 tabular-nums">
+                            {String(i + 1).padStart(2, '0')}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="font-sans text-white text-lg sm:text-xl font-semibold tracking-tight text-balance">
+                            {item.title}
+                          </h3>
+                          <p className="mt-2 font-sans text-white/60 text-[12.5px] sm:text-[13.5px] leading-relaxed">
+                            {item.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Sheen across the surface, as on a real card. */}
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background:
+                            'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.10) 45%, transparent 60%)',
+                        }}
+                      />
+                    </div>
+                  );
+                }
+
+                // Back face — flipped so it reads correctly as the card turns.
+                return (
+                  <div
+                    key={layer}
+                    className="absolute inset-0 rounded-[18px] overflow-hidden pointer-events-none border border-white/10"
+                    style={{
+                      background:
+                        'linear-gradient(150deg, rgba(255,255,255,0.05), rgba(0,0,0,0.55))',
+                      transform: `translateZ(${zOffset}px) rotateX(180deg)`,
+                      backfaceVisibility: 'hidden',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
+                    }}
+                  >
+                    <div className="absolute left-0 right-0 top-5 h-8 bg-black/70" />
+                    <div className="absolute left-6 bottom-6 right-6">
+                      <p className="font-sans text-[11px] uppercase tracking-[0.28em] text-white/40">
+                        Farruggia Facility
+                      </p>
+                      <p className="mt-1.5 font-sans text-white/80 text-sm font-medium">
+                        {item.title}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

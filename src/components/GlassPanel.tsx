@@ -67,10 +67,15 @@ export default function GlassPanel() {
           yPercent: 0,
           ease: 'none',
           scrollTrigger: {
-            trigger: container,
-            start: 'top bottom',
-            end: 'bottom bottom',
+            // Explicit pixel range rather than 'top bottom' → 'bottom bottom'.
+            // That pair spanned a full viewport starting only once the panel's
+            // container reached the screen, which left a gap after the headline
+            // had faded. Starting at 0.25vh overlaps the two.
+            trigger: document.body,
+            start: () => window.innerHeight * 0.25,
+            end: () => window.innerHeight * 1.2,
             scrub: 0.7,
+            invalidateOnRefresh: true,
           },
         },
       );
@@ -93,8 +98,8 @@ export default function GlassPanel() {
         <GlassSurface
           className="w-full h-full"
           panelClassName="w-full h-full flex flex-col justify-between rounded-2xl sm:rounded-3xl"
-          tilt={4}
-          lift={10}
+          tilt={9}
+          lift={16}
           glareSize={900}
         >
           {/* ---- Copy + collapsible services ---- */}

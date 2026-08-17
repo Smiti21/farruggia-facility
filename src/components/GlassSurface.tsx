@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import gsap from 'gsap';
 import { allowInputMotion, canHover } from '../lib/motion';
+import { subscribeToDeviceTilt } from '../lib/deviceTilt';
 
 interface GlassSurfaceProps {
   children: ReactNode;
@@ -36,8 +37,8 @@ export default function GlassSurface({
   children,
   className = '',
   panelClassName = '',
-  tilt = 4,
-  lift = 12,
+  tilt = 9,
+  lift = 16,
   glare = true,
   glareSize = 520,
   style,
@@ -162,6 +163,24 @@ export default function GlassSurface({
       if (frame) cancelAnimationFrame(frame);
     };
   }, [tilt, lift, glare, pointerCapable]);
+
+  /* ---- Device orientation: the phone itself becomes the cursor ----------- */
+  useEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    // Only where there is no hovering pointer — otherwise a 2-in-1 with both a
+    // mouse and a gyroscope would have two sources fighting over one transform.
+    if (pointerCapable || !allowInputMotion()) return;
+
+    const opts = { duration: 0.6, ease: 'power2.out' };
+    const rotX = gsap.quickTo(pane, 'rotationX', opts);
+    const rotY = gsap.quickTo(pane, 'rotationY', opts);
+
+    return subscribeToDeviceTilt((x, y) => {
+      rotY(x * tilt * 2);
+      rotX(-y * tilt * 2);
+    });
+  }, [tilt, pointerCapable]);
 
   return (
     <div className={className} style={{ perspective: '1000px', ...style }}>

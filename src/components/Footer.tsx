@@ -40,8 +40,8 @@ export default function Footer() {
           <GlassSurface
             className="w-full"
             panelClassName="rounded-2xl sm:rounded-3xl px-5 sm:px-8 md:px-14 py-14 sm:py-18 md:py-24 text-center"
-            tilt={3}
-            lift={8}
+            tilt={8}
+            lift={14}
             glareSize={800}
           >
             {/* Brand mark */}

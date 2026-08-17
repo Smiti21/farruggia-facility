@@ -67,13 +67,14 @@ export default function Home() {
 
       {/* Scroll track for the hero type and the glass panel.
 
-          Sized to exactly what the two animations need, with nothing spare:
-            0 → 1vh   the headline dissolves
-            1vh → 2vh the glass panel rises (its container is the last vh of
-                      the track, so its trigger spans precisely one viewport)
-          That totals 3vh. At 500vh, 1880px of this track — over half of it —
-          was scrolling past with nothing happening at all. */}
-      <div id="hero-scroll" className="relative h-[300vh]">
+          The two animations overlap rather than running back to back:
+            0    → 0.8vh   the headline dissolves
+            0.25vh → 1.2vh the glass panel rises
+          The panel is already on its way up while the headline is still
+          leaving, so there is never a moment showing only the video. The track
+          needs 2vh for the panel's own container plus the overlap, hence 220vh
+          — down from 300vh, and 500vh before that. */}
+      <div id="hero-scroll" className="relative h-[220vh]">
         {/* Layer 3 — glass panel, parked at the bottom of the track */}
         <GlassPanel />
       </div>
