@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Leaf, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useLanguage } from './LanguageContext';
@@ -22,8 +24,14 @@ const THICKNESS = [-1.47, -0.73, 0, 0.73, 1.47];
 
 /** Perspective distance. The peek maths below depends on this exact value. */
 const PERSPECTIVE = 1350;
-/** Progress added per frame. One card every ~7.5s at 60fps. */
-const SPEED = 0.0022;
+/**
+ * Scroll distance the section stays pinned for, per card, as a fraction of the
+ * viewport height. Four cards at 0.75 means the section holds the screen for
+ * roughly three viewports before releasing.
+ */
+const SCROLL_PER_CARD = 0.75;
+/** How quickly the cylinder chases the scroll position. Lower is heavier. */
+const FOLLOW = 0.12;
 /** Gap between the centre card and its neighbours. */
 const GAP = 36;
 /** How far past the stage edge the outer cards are pushed. */
@@ -36,17 +44,19 @@ export default function ServicesCarousel() {
   const items = tList<ServiceItem>('services.items');
   const cardCount = items.length;
 
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const frameId = useRef(0);
 
   const progress = useRef(0);
+  /** Where the scrollbar says the cylinder should be. */
+  const targetProgress = useRef(0);
   const tilt = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
   // Defaults to visible so that if IntersectionObserver never reports (or is
   // unavailable) the carousel still animates. Defaulting to false would leave
   // it frozen with no way to recover.
   const visible = useRef(true);
-  const paused = useRef(false);
 
   const [metrics, setMetrics] = useState({ cardW: 340, cardH: 243 });
 
@@ -117,6 +127,36 @@ export default function ServicesCarousel() {
     return () => observer.disconnect();
   }, []);
 
+  /* ---- Pin the section and let the scrollbar drive the cylinder ---------- */
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    const stage = stageRef.current;
+    if (!wrapper || !stage || cardCount < 2) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const trigger = ScrollTrigger.create({
+      trigger: wrapper,
+      start: 'top top',
+      // The pin length is what the visitor scrolls through while the section
+      // holds the screen. Expressed as a function so it re-measures on resize.
+      end: () => `+=${window.innerHeight * SCROLL_PER_CARD * cardCount}`,
+      pin: stage,
+      pinSpacing: true,
+      // Lets ScrollTrigger apply the pin a fraction early, which removes the
+      // one-frame jump you otherwise get at high scroll speeds.
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => {
+        // Map 0…1 across the pin onto card 0 → last card, so the section
+        // releases exactly as the final card settles at the front.
+        targetProgress.current = self.progress * (cardCount - 1);
+      },
+    });
+
+    return () => trigger.kill();
+  }, [cardCount]);
+
   /* ---- Render loop -------------------------------------------------------- */
   useEffect(() => {
     if (!cardCount) return;
@@ -129,7 +169,10 @@ export default function ServicesCarousel() {
       // the moment the section scrolls back in.
       if (!visible.current) return;
 
-      if (!paused.current) progress.current += SPEED;
+      // Chase the scroll position rather than advancing on a timer. The easing
+      // here is what keeps the cylinder feeling weighted instead of welded to
+      // the scrollbar.
+      progress.current += (targetProgress.current - progress.current) * FOLLOW;
 
       // Inertia — the tilt lags the cursor rather than snapping to it.
       tilt.current.x += (tilt.current.targetX - tilt.current.x) * 0.08;
@@ -218,13 +261,14 @@ export default function ServicesCarousel() {
   }, [metrics, cardCount]);
 
   return (
-    <div
-      ref={stageRef}
-      className="relative w-full h-[70vh] min-h-[520px] max-h-[760px] flex items-center justify-center overflow-hidden"
-      style={{ perspective: `${PERSPECTIVE}px` }}
-      onMouseEnter={() => { paused.current = true; }}
-      onMouseLeave={() => { paused.current = false; }}
-    >
+    <div ref={wrapperRef} className="relative">
+      {/* Full-viewport while pinned, so nothing else competes for attention
+          while the visitor scrolls through the cards. */}
+      <div
+        ref={stageRef}
+        className="relative w-full h-screen flex items-center justify-center overflow-hidden"
+        style={{ perspective: `${PERSPECTIVE}px` }}
+      >
       <div
         className="absolute"
         style={{
@@ -345,6 +389,7 @@ export default function ServicesCarousel() {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

@@ -299,6 +299,25 @@ step with the track at any screen height. Previously the track was 500vh with
 fixed-pixel fades: **1880px of it — over half — scrolled past with nothing
 happening at all.**
 
+### The services carousel
+
+[`ServicesCarousel`](src/components/ServicesCarousel.tsx) puts each service on a
+vertical 3D cylinder. The section **pins**: when it reaches the top of the
+viewport the stage sticks, and scrolling drives the cylinder through every card
+before the page releases and carries on.
+
+| | |
+| --- | --- |
+| Pin length | `0.75 × viewport height × card count` (~2700px on a 900px-tall window) |
+| Progress mapping | `0 → 1` across the pin becomes card `0 → last`, so it releases exactly as the final card settles |
+| Follow | The cylinder eases toward the scroll position (`FOLLOW = 0.12`) rather than being welded to it |
+| Depth | Five stacked slices per card give real volumetric thickness; separate front and back faces |
+| Geometry | Neighbours sit at `cardH + gap`; outer cards use a perspective-aware formula so their edge lands exactly on the stage boundary |
+
+The render loop idles whenever the section is off screen, and is driven entirely
+by scroll — there is no timer, which is also why it needs no reduced-motion
+exemption.
+
 ### Performance notes
 
 Several large `backdrop-filter` panes over a *playing* video is the most demanding
