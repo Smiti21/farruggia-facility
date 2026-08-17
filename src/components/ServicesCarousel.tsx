@@ -32,10 +32,20 @@ const PERSPECTIVE = 1350;
 const SCROLL_PER_CARD = 0.75;
 /** How quickly the cylinder chases the scroll position. Lower is heavier. */
 const FOLLOW = 0.12;
-/** Gap between the centre card and its neighbours. */
+/**
+ * Gap between the centre card and its neighbours.
+ *
+ * 36 is the balance point. Lower and the neighbour collides with the centre
+ * card, which is magnified 1.4x by perspective and so much taller than it
+ * looks; higher and it collides with the card leaving the frame behind it.
+ */
 const GAP = 36;
-/** How far past the stage edge the outer cards are pushed. */
-const PEEK = -55;
+/**
+ * Exponent on the departing card's travel. 1.0 sends it off immediately and
+ * leaves the stage sparse; 2.2 keeps it around but lets the neighbour catch up
+ * to it. 1.5 holds it in frame without the two ever meeting.
+ */
+const EXIT_EASE = 1.5;
 
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
@@ -217,30 +227,31 @@ export default function ServicesCarousel() {
           y = -sign * (t * (cardH + GAP));
           z = 400 + t * (220 - 400);
           rot = t * 132;
-        } else if (abs <= 2) {
-          const t = smoothstep(abs - 1);
-          const zEnd = -60;
-          // Perspective-aware, so the card's edge lands exactly on the stage
-          // boundary rather than at an arbitrary offset.
-          const scaleEnd = PERSPECTIVE / (PERSPECTIVE - zEnd);
-          const yEnd = (h / 2 - PEEK) / scaleEnd - cardH / 2;
-
-          y = -sign * ((cardH + GAP) + t * (yEnd - (cardH + GAP)));
-          z = 220 + t * (zEnd - 220);
-          rot = 132 + t * (175 - 132);
         } else {
-          const t = smoothstep(Math.min(abs - 2, 1));
-          const zMid = -60;
+          // offset 1 → 2: the neighbour continues past the edge and out of
+          // sight.
+          //
+          // With four cards, offset 2 is the far side of the cylinder — the
+          // same slot as offset -2 — so a card there has to be off-screen.
+          // Parking it at the stage edge instead (as a five-card carousel can
+          // afford to) puts two cards on the same side of the centre, and they
+          // overlapped by ~47px at every settled position.
+          const t = smoothstep(Math.min(abs - 1, 1));
           const zEnd = -250;
+          const rotEnd = 195;
 
-          const scaleMid = PERSPECTIVE / (PERSPECTIVE - zMid);
-          const yMid = (h / 2 - PEEK) / scaleMid - cardH / 2;
+          // Perspective-aware: solve for the offset that puts the card a full
+          // card-height beyond the stage boundary at its final depth.
           const scaleEnd = PERSPECTIVE / (PERSPECTIVE - zEnd);
-          const yEnd = (h / 2 + 100) / scaleEnd + cardH / 2;
+          const yEnd = (h / 2 + cardH) / scaleEnd + cardH / 2;
 
-          y = -sign * (yMid + t * (yEnd - yMid));
-          z = zMid + t * (zEnd - zMid);
-          rot = 175 + t * (195 - 175);
+          // Travel is eased harder than depth, so the card hangs near the stage
+          // edge rather than leaving as soon as it passes the neighbour.
+          const tTravel = Math.pow(t, EXIT_EASE);
+
+          y = -sign * ((cardH + GAP) + tTravel * (yEnd - (cardH + GAP)));
+          z = 220 + t * (zEnd - 220);
+          rot = 132 + t * (rotEnd - 132);
         }
 
         // Interactive tilt applies only to the card at the front.
