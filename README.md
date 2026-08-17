@@ -82,7 +82,7 @@ that on the phone. It only works on the same network, and your PC has to stay on
 
 - **GitHub Pages under a project subpath** (`user.github.io/repo/`) needs `base: '/repo/'` in `vite.config.ts`, otherwise the asset URLs resolve wrongly. The hosts above all serve from a domain root, so nothing is needed there.
 - **The video is 3.6 MB.** That is the bulk of a first visit on mobile data. If that matters, re-encode smaller — see the guidance below.
-- **On phones the tilt, glare, parallax and weighted scrolling are all off** by design: there is no hovering cursor to drive them. Phone visitors get the glass panels and the scroll-scrubbed reveals, which is the intended mobile experience — not a bug.
+- **On phones the tilt, glare, parallax and weighted scrolling are all off** by design: there is no hovering cursor to drive them. Phone visitors get the glass panels, the pinned carousel and the scroll-scrubbed reveals, which is the intended mobile experience — not a bug. See the note on device tilt below.
 - **iOS Low Power Mode blocks video autoplay.** The page stays on its first frame rather than breaking, but the background will not move for those visitors.
 
 ---
@@ -317,6 +317,30 @@ before the page releases and carries on.
 The render loop idles whenever the section is off screen, and is driven entirely
 by scroll — there is no timer, which is also why it needs no reduced-motion
 exemption.
+
+Each card carries a motif etched into the glass — blueprint pipework, perimeter
+rings, a climbing vine, a node lattice — drawn in
+[`ServiceMotifs`](src/components/ServiceMotifs.tsx) in a 280×200 viewBox that
+matches the cards' 1.4 aspect exactly, so the art maps edge-for-edge at any size
+and hairlines never skew. The layer is `aria-hidden` ornament, held at 16% white
+and masked away beneath the text block.
+
+### Device tilt is switched off
+
+[`deviceTilt`](src/lib/deviceTilt.ts) can make a phone's own gyroscope drive the
+tilt, so the glass leans as the handset moves. **It is disabled** (`ENABLED =
+false` at the top of that file).
+
+iOS gates the motion sensor behind a permission prompt that must come from a user
+gesture, which meant the first tap anywhere on the site raised an *"allow motion
+and orientation access?"* dialog — a poor greeting for someone who just wants to
+read about cleaning contracts. The switch sits inside the module rather than at
+the call sites, so `subscribeToDeviceTilt` still exists and still returns a valid
+unsubscribe; it simply never registers a listener and never reaches
+`requestPermission`. Panes and cards stay level on touch devices.
+
+Worth knowing if you reconsider: the prompt is an iOS behaviour. Android exposes
+the sensor without asking, so re-enabling would only prompt on iPhones and iPads.
 
 ### Performance notes
 

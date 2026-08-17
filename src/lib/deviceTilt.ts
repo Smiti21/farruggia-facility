@@ -6,9 +6,24 @@
  * property of the device, not of any one element, so a single listener feeds
  * all subscribers rather than each pane attaching its own.
  *
- * iOS 13+ requires an explicit permission grant that must originate from a user
- * gesture, so the request is deferred to the visitor's first touch.
+ * ---------------------------------------------------------------------------
+ * CURRENTLY DISABLED. Set ENABLED to true to switch it back on.
+ *
+ * iOS 13+ gates the motion sensor behind a permission prompt that has to come
+ * from a user gesture — so the first tap on the site raised a "allow motion and
+ * orientation access?" dialog. That is a poor first impression for a visitor
+ * who only wants to read about cleaning contracts, so the feature is off.
+ *
+ * The switch is here rather than at the call sites so that nothing else has to
+ * change: `subscribeToDeviceTilt` still exists and still returns a valid
+ * unsubscribe function, it simply never attaches a listener and never reaches
+ * `requestPermission`. Panes and cards stay level on touch devices.
+ *
+ * Note that the prompt is an iOS behaviour. Android exposes the sensor without
+ * asking, so re-enabling this would only prompt on iPhones and iPads.
+ * ---------------------------------------------------------------------------
  */
+const ENABLED = false;
 
 type TiltListener = (x: number, y: number) => void;
 
@@ -77,6 +92,10 @@ function requestPermissionOnFirstGesture() {
  * never fires.
  */
 export function subscribeToDeviceTilt(listener: TiltListener): () => void {
+  // Bail before anything is registered: no sensor listener, no gesture hook,
+  // and therefore no permission prompt on any platform.
+  if (!ENABLED) return () => {};
+
   if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) {
     return () => {};
   }
