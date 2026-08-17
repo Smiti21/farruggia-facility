@@ -1,0 +1,166 @@
+/* Outfit is linked from index.html, not @import-ed here — see the comment there. */
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  /* Outfit is the only typeface on the site. `font-serif` is aliased to it so
+     the template's serif class names keep working without a second font load. */
+  --font-serif: "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+  /* The palette is strictly monochrome: black, white, and white at varying
+     opacity. Accent weight comes from contrast and scale, not from hue. */
+
+  --animate-marquee: marquee 20s linear infinite;
+  @keyframes marquee {
+    100% { transform: translateX(-50%); }
+  }
+}
+
+body {
+  background-color: black;
+  color: white;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+html {
+  /* GSAP animates window.scrollY frame by frame; native smooth scrolling
+     would fight it and cause rubber-banding. */
+  scroll-behavior: auto;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   Liquid glass
+   Every section sits on one of these panes, over the looping video.
+
+   The blur radius is the single most expensive paint on the page — the
+   compositor re-samples the moving video behind every pane, every frame. With
+   several panes on screen at once the radius has to stay modest: 36px is
+   visually indistinguishable from 160px over footage, and phones drop to 14px
+   where the GPU budget is far tighter.
+--------------------------------------------------------------------------- */
+:root {
+  --glass-blur: 30px;
+  --glass-tint: rgba(0, 0, 0, 0.26);
+  --glass-edge: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --glass-blur: 12px;
+    --glass-tint: rgba(0, 0, 0, 0.38);
+  }
+}
+
+.glass-surface {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--glass-tint);
+  /* No saturate(): it is a second filter pass over the same pixels for an
+     effect that is invisible against monochrome content. */
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-edge);
+  /* Inner top edge catches the light; the drop shadow lifts the pane off the
+     video so it reads as a physical sheet rather than a tinted rectangle. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+    0 40px 90px -30px rgba(0, 0, 0, 0.75);
+}
+
+/* `will-change: transform` is applied by GlassSurface only while the pointer is
+   actually on a pane, never as a standing style.
+   Declaring it permanently forced all six panes to hold their own composited
+   layer for the whole session — six full-screen-ish surfaces each re-sampling
+   the video behind them, whether or not anything was moving. That is the main
+   source of scroll stutter on a page like this.
+   `transform-style: preserve-3d` is likewise absent: a pane's own rotation is
+   projected by the perspective on its parent, so preserve-3d would only matter
+   for 3D *children*, of which there are none. */
+.glass-surface.is-interacting {
+  will-change: transform;
+}
+
+/* The glare is a large element (up to 900px square). Promoting it permanently
+   would create six standing layers — exactly the cost removed above — so it is
+   promoted only while its pane is being hovered. */
+.glass-surface.is-interacting .glass-glare {
+  will-change: transform;
+}
+
+/* Specular highlight that follows the cursor across the pane.
+   This is a fixed-size circle that gets translated, NOT a gradient whose
+   position changes. Moving a gradient's centre re-rasterises the whole
+   gradient on every pointer frame — a paint. Translating a pre-rendered
+   element is compositor-only work. */
+.glass-glare {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--glare-size, 520px);
+  height: var(--glare-size, 520px);
+  margin-left: calc(var(--glare-size, 520px) / -2);
+  margin-top: calc(var(--glare-size, 520px) / -2);
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--glare-opacity, 0);
+  transition: opacity 0.5s ease;
+  background: radial-gradient(
+    circle closest-side,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.05) 45%,
+    transparent 100%
+  );
+}
+
+/* Panes scrolled well away from the viewport drop their backdrop-filter.
+   The filter is charged per pane even off-screen, because it establishes a
+   stacking context the compositor still has to resolve against the moving
+   video. The class is added by GlassSurface's IntersectionObserver, so the
+   default state stays blurred — if the observer never runs, nothing is lost. */
+.glass-surface.is-offscreen {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Everything except the glare needs to sit above it. */
+.glass-surface > *:not(.glass-glare) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Browsers without backdrop-filter get opaque panes instead of transparent
+   ones with unreadable text over the video. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-surface {
+    background-color: rgba(8, 8, 8, 0.93);
+  }
+}
+
+/* Swiss minimal scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: #1c1c1c; }
+::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
+
+::selection {
+  background: #ffffff;
+  color: #000000;
+}
+
+:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+}
+
+/* The marquee is the one piece of ambient motion on the site — it plays with
+   no input at all — so it is the one piece that reduced motion switches off.
+   Everything else only moves in response to the pointer or the scrollbar.
+   See src/lib/motion.ts. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none !important;
+  }
+}

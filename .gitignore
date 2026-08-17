@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+.vite
+
+# Local tooling state, not part of the website.
+.claude/
+.claude-flow/
+.remember/
+
+# The original drop of the background video. The copy the site actually serves
+# lives at public/videos/video1.mp4, so committing this too would put the same
+# 3.5 MB in the repo twice. The file stays on disk, it just isn't tracked.
+/video1.mp4

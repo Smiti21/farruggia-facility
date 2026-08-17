@@ -1,0 +1,241 @@
+.pill-nav-container {
+  --pill-bg: #000;
+  --pill-text: #fff;
+  --pill-surface: #f0f0f0;
+  --pill-accent: #ffffff;
+
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  font-family: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+}
+
+.pill-nav {
+  display: flex;
+  align-items: center;
+  background-color: transparent;
+  padding: 0;
+  gap: 8px;
+}
+
+.pill-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: var(--pill-bg);
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.logo-svg-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill-nav-items {
+  background-color: var(--pill-bg);
+  border-radius: 50px;
+  padding: 4px;
+  border: 2px solid #000;
+  overflow: hidden;
+}
+
+.pill-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pill {
+  position: relative;
+  display: block;
+  padding: 8px 24px;
+  border-radius: 50px;
+  text-decoration: none;
+  color: #000;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  overflow: hidden;
+  background-color: var(--pill-surface);
+  transition: background-color 0.3s ease;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.pill.is-active {
+  background-color: #e0e0e0;
+}
+
+.hover-circle {
+  position: absolute;
+  background-color: #000;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  transform: scale(0);
+}
+
+.label-stack {
+  position: relative;
+  display: block;
+  z-index: 1;
+  overflow: hidden;
+  height: 1.2em;
+}
+
+.pill-label,
+.pill-label-hover {
+  display: block;
+  line-height: 1.2em;
+  text-align: center;
+}
+
+.pill-label-hover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  color: #fff;
+}
+
+/* Language toggle sits in the same black shell as the pills. */
+.pill-lang {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 50px;
+  background-color: var(--pill-bg);
+  border: 2px solid #000;
+  color: var(--pill-text);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color 0.3s ease, background-color 0.3s ease;
+  flex-shrink: 0;
+}
+
+.pill-lang:hover {
+  color: var(--pill-accent);
+}
+
+.pill-lang .lang-active {
+  color: var(--pill-accent);
+}
+
+.mobile-menu-button {
+  background: var(--pill-bg);
+  border: 2px solid #000;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.hamburger-line {
+  width: 22px;
+  height: 2px;
+  background-color: var(--pill-text);
+  display: block;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-menu-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background-color: var(--pill-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 16px;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.mobile-menu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobile-menu-link {
+  color: var(--pill-text);
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  display: block;
+  text-align: center;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.mobile-menu-link:hover {
+  color: var(--pill-accent);
+}
+
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .pill-nav-container {
+    top: 14px;
+    width: calc(100% - 28px);
+  }
+  .pill-nav {
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+/* Very narrow phones: shed the EN/DE labels and keep just the globe. */
+@media (max-width: 360px) {
+  .pill-lang {
+    padding: 0 12px;
+    gap: 0;
+  }
+  .pill-lang span {
+    display: none;
+  }
+}

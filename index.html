@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+
+    <!-- Fonts are linked here rather than @import-ed from CSS: an @import inside
+         a stylesheet cannot be discovered until that stylesheet has downloaded
+         and parsed, which serialises two round trips before any text can paint.
+         Only the four weights the site actually uses are requested (400/500/
+         600/700) — 800 and 900 were being downloaded and never applied. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap"
+    />
+
+    <title>Farruggia Facility — Swiss Facility Management, Frauenfeld</title>
+    <meta
+      name="description"
+      content="Farruggia Facility delivers technical maintenance, security, landscaping and cleaning for properties across Switzerland. Swiss precision in every detail."
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
